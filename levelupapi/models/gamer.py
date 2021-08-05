@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User #pylint:disable=imported-auth-user
 
 
 class Gamer(models.Model):
@@ -8,5 +8,7 @@ class Gamer(models.Model):
         models (OneToOneField): The user information for the gamer
         bio (CharField): The bio of the user
     """
+
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     bio = models.CharField(max_length=50)
+    
