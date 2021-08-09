@@ -7,7 +7,6 @@ from rest_framework.response import Response
 
 from levelupapi.models import Gamer
 
-
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_user(request):
@@ -35,7 +34,6 @@ def login_user(request):
         data = { 'valid': False }
         return Response(data)
 
-
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
@@ -43,6 +41,7 @@ def register_user(request):
     Method arguments:
       request -- The full HTTP request object
     '''
+    
     # Create a new user by invoking the `create_user` helper method
     # on Django's built-in User model
     new_user = User.objects.create_user(
@@ -64,4 +63,3 @@ def register_user(request):
     # Return the token to the client
     data = { 'token': token.key }
     return Response(data)
-    

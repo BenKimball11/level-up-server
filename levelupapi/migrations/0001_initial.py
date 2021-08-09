@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
                 ('date', models.DateField()),
                 ('time', models.TimeField()),
                 ('description', models.TextField()),
-                ('title', models.CharField(max_length=100)),
+                ('name', models.CharField(max_length=100)),
             ],
         ),
         migrations.CreateModel(
