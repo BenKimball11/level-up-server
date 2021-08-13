@@ -1,15 +1,13 @@
 """View module for handling requests about events"""
-
-from django.contrib.auth.models import User #pylint:disable=imported-auth-user
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseServerError
 from rest_framework import status
-# from rest_framework.decorators import action
+from rest_framework.decorators import action
 from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
 from rest_framework import serializers
 from levelupapi.models import Game, Event, Gamer
-from levelupapi.views.game import GameSerializer
 
 
 class EventView(ViewSet):
@@ -27,8 +25,6 @@ class EventView(ViewSet):
         event.date = request.data["date"]
         event.description = request.data["description"]
         event.host = gamer
-        #event.title = request.data["title"]
-        #event.attendees = request.data["attendees"]
 
         game = Game.objects.get(pk=request.data["gameId"])
         event.game = game
@@ -57,13 +53,13 @@ class EventView(ViewSet):
         Returns:
             Response -- Empty body with 204 status code
         """
-        host = Gamer.objects.get(user=request.auth.user)
+        organizer = Gamer.objects.get(user=request.auth.user)
 
         event = Event.objects.get(pk=pk)
         event.description = request.data["description"]
         event.date = request.data["date"]
         event.time = request.data["time"]
-        event.host = host
+        event.host = organizer
 
         game = Game.objects.get(pk=request.data["gameId"])
         event.game = game
@@ -94,69 +90,64 @@ class EventView(ViewSet):
             Response -- JSON serialized list of events
         """
         events = Event.objects.all()
-
+        gamer = Gamer.objects.get(user=request.auth.user)
         # Support filtering events by game
-        game = self.request.query_params.get('gameId', None)
+        game = self.request.query_params.get('game_id', None)
         if game is not None:
             events = events.filter(game__id=game)
+
+        for event in events:
+            event.joined = gamer in event.attendees.all()
 
         serializer = EventSerializer(
             events, many=True, context={'request': request})
         return Response(serializer.data)
 
     @action(methods=['post', 'delete'], detail=True)
-    def signup(self, request, pk=None):
-        """Managing gamers signing up for events"""
-        # Django uses the `Authorization` header to determine
-        # which user is making the request to sign up
+    def signup(self, request, pk):
         gamer = Gamer.objects.get(user=request.auth.user)
-        
         try:
-            # Handle the case if the client specifies a game
-            # that doesn't exist
             event = Event.objects.get(pk=pk)
         except Event.DoesNotExist:
-            return Response(
-                {'message': 'Event does not exist.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+           return Response(
+            {'message': 'Event does not exist.'},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
-        # A gamer wants to sign up for an event
         if request.method == "POST":
             try:
-                # Using the attendees field on the event makes it simple to add a gamer to the event
-                # .add(gamer) will insert into the join table a new row the gamer_id and the event_id
                 event.attendees.add(gamer)
                 return Response({}, status=status.HTTP_201_CREATED)
             except Exception as ex:
                 return Response({'message': ex.args[0]})
-
-        # User wants to leave a previously joined event
         elif request.method == "DELETE":
             try:
-                # The many to many relationship has a .remove method that removes the gamer from the attendees list
-                # The method deletes the row in the join table that has the gamer_id and event_id
                 event.attendees.remove(gamer)
                 return Response(None, status=status.HTTP_204_NO_CONTENT)
             except Exception as ex:
                 return Response({'message': ex.args[0]})
 
-
-
 class EventUserSerializer(serializers.ModelSerializer):
-    """JSON serializer for event host's related Django user"""
+    """JSON serializer for event organizer's related Django user"""
     class Meta:
         model = User
         fields = ['first_name', 'last_name', 'email']
 
 
 class EventGamerSerializer(serializers.ModelSerializer):
-    """JSON serializer for event host"""
+    """JSON serializer for event organizer"""
     user = EventUserSerializer(many=False)
 
     class Meta:
         model = Gamer
         fields = ['user']
+
+
+class GameSerializer(serializers.ModelSerializer):
+    """JSON serializer for games"""
+    class Meta:
+        model = Game
+        fields = ('id', 'name', 'maker', 'number_of_players', 'description')
 
 
 class EventSerializer(serializers.ModelSerializer):
@@ -166,4 +157,5 @@ class EventSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Event
-        fields = '__all__'
+        fields = ('id', 'game', 'host',
+                  'description', 'date', 'time', 'joined')
